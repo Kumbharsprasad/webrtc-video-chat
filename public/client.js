@@ -11,6 +11,7 @@ const remoteVideo = document.getElementById('remoteVideo');
 
 const muteBtn = document.getElementById('muteBtn');
 const cameraBtn = document.getElementById('cameraBtn');
+const flipCameraBtn = document.getElementById('flipCameraBtn');
 const hangupBtn = document.getElementById('hangupBtn');
 
 const statusText = document.getElementById('statusText');
@@ -28,6 +29,7 @@ let localStream;
 let peerConnection;
 let roomName;
 let isInitiator = false;
+let currentFacingMode = 'user'; // 'user' for front camera, 'environment' for rear
 
 // STUN servers
 const rtcConfig = {
@@ -45,6 +47,7 @@ roomInput.addEventListener('keypress', (e) => {
 
 muteBtn.addEventListener('click', toggleMute);
 cameraBtn.addEventListener('click', toggleVideo);
+flipCameraBtn.addEventListener('click', flipCamera);
 hangupBtn.addEventListener('click', hangup);
 
 async function joinRoom() {
@@ -55,7 +58,10 @@ async function joinRoom() {
     callScreen.style.display = 'block';
     
     try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: currentFacingMode }, 
+            audio: true 
+        });
         localVideo.srcObject = localStream;
         
         socket.emit('join', roomName);
@@ -177,6 +183,7 @@ async function createOffer() {
 
 // Media Controls
 function toggleMute() {
+    if (!localStream) return;
     const audioTrack = localStream.getAudioTracks()[0];
     if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
@@ -191,6 +198,7 @@ function toggleMute() {
 }
 
 function toggleVideo() {
+    if (!localStream) return;
     const videoTrack = localStream.getVideoTracks()[0];
     if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
@@ -204,6 +212,56 @@ function toggleVideo() {
             // Optionally dim local video when off
             localVideo.style.opacity = '0.3';
         }
+    }
+}
+
+async function flipCamera() {
+    if (!localStream) return;
+    
+    // Toggle the requested facing mode
+    currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    
+    try {
+        // Request a new stream with the updated video constraints
+        const newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: currentFacingMode }
+            // We don't request audio again to prevent audio disruption/double tracks
+        });
+        
+        const newVideoTrack = newStream.getVideoTracks()[0];
+        const oldVideoTrack = localStream.getVideoTracks()[0];
+        
+        // Remove old track and add new one to local stream
+        localStream.removeTrack(oldVideoTrack);
+        localStream.addTrack(newVideoTrack);
+        
+        // Specifically stop the old hardware camera sensor
+        oldVideoTrack.stop();
+        
+        // If connected, replace the track in the peer connection
+        if (peerConnection) {
+            const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) {
+                sender.replaceTrack(newVideoTrack);
+            }
+        }
+        
+        // Sync disabled state if the camera was toggled "off" via the UI
+        if (cameraBtn.classList.contains('active')) {
+            newVideoTrack.enabled = false;
+        }
+
+        // Disable mirroring if it's the rear camera
+        if (currentFacingMode === 'environment') {
+            localVideo.style.transform = 'scaleX(1)';
+        } else {
+            localVideo.style.transform = 'scaleX(-1)';
+        }
+        
+    } catch (err) {
+        console.error('Error flipping camera. Your device might not have multiple cameras.', err);
+        // Revert variable toggle if failed
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
     }
 }
 
@@ -236,6 +294,10 @@ function hangup() {
     cameraBtn.classList.remove('active');
     cameraBtn.querySelector('svg').innerHTML = videoOnPath;
     localVideo.style.opacity = '1';
+    
+    // Reset facing mode entirely
+    currentFacingMode = 'user';
+    localVideo.style.transform = 'scaleX(-1)';
 }
 
 window.addEventListener('beforeunload', () => {

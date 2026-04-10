@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Stellar - WebRTC Video Chat</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -22,6 +22,7 @@
             margin: 0;
             padding: 0;
             font-family: 'Outfit', sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
@@ -31,6 +32,8 @@
                 radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.15), transparent 25%);
             color: var(--text-color);
             height: 100vh;
+            /* Ensures actual viewport height on mobile (bypasses browser URL bars) */
+            height: 100dvh; 
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -93,7 +96,7 @@
             padding: 16px;
             border-radius: 12px;
             border: 1px solid var(--glass-border);
-            background: rgba(15, 23, 42, 0.5);
+            background: rgba(15, 23, 42, 0.8);
             color: var(--text-color);
             font-size: 1.1rem;
             outline: none;
@@ -150,22 +153,31 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            background-color: #1e293b;
+            background-color: #0f172a;
         }
 
         .local-video-wrapper {
             position: absolute;
-            top: 30px;
-            right: 30px;
-            width: 250px;
-            aspect-ratio: 16 / 9;
+            top: 20px;
+            right: 20px;
+            width: 30%;
+            max-width: 250px;
+            min-width: 120px;
+            aspect-ratio: 9 / 16; /* Portrait ratio standard for mobile */
             border-radius: 16px;
             overflow: hidden;
             border: 2px solid var(--glass-border);
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-            background-color: #0f172a;
+            background-color: #1e293b;
             z-index: 5;
             transition: transform 0.3s ease;
+        }
+
+        @media (min-aspect-ratio: 1/1) {
+            .local-video-wrapper {
+                aspect-ratio: 16 / 9; /* Landscape ratio for desktops/tablets */
+                width: 250px;
+            }
         }
 
         .local-video-wrapper:hover {
@@ -176,18 +188,19 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Mirror effect */
+            transform: scaleX(-1); /* Mirror effect defaults to true for 'user' facing */
+            transition: opacity 0.3s ease;
         }
 
         /* Controls */
         .controls-wrapper {
             position: absolute;
-            bottom: 40px;
+            bottom: 30px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 20px;
-            padding: 15px 30px;
+            gap: 15px;
+            padding: 12px 24px;
             background: rgba(15, 23, 42, 0.6);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
@@ -198,8 +211,8 @@
         }
 
         .control-btn {
-            width: 56px;
-            height: 56px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -227,6 +240,15 @@
             stroke: #0f172a;
         }
 
+        #flipCameraBtn {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+        
+        #flipCameraBtn:hover {
+            background: rgba(99, 102, 241, 0.4);
+        }
+
         .control-btn.hangup {
             background: var(--danger);
             box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
@@ -237,8 +259,8 @@
         }
 
         .icon {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             fill: white;
             transition: all 0.2s ease;
         }
@@ -246,19 +268,20 @@
         /* Status Overlay */
         #status {
             position: absolute;
-            top: 30px;
-            left: 30px;
+            top: 20px;
+            left: 20px;
             background: rgba(15, 23, 42, 0.6);
             backdrop-filter: blur(10px);
-            padding: 10px 20px;
+            padding: 8px 16px;
             border-radius: 30px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #e2e8f0;
             border: 1px solid var(--glass-border);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             z-index: 5;
+            max-width: calc(100vw - 160px); /* Leave room for local video on slim devices */
         }
 
         .status-dot {
@@ -268,6 +291,7 @@
             border-radius: 50%;
             box-shadow: 0 0 8px #22c55e;
             animation: pulse 2s infinite;
+            flex-shrink: 0;
         }
         
         .status-dot.waiting {
@@ -275,10 +299,23 @@
             box-shadow: 0 0 8px #f59e0b;
         }
 
-        @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.8; }
+        /* Mobile specific adjustments */
+        @media (max-width: 480px) {
+            .lobby-card {
+                padding: 30px 20px;
+                width: 85%;
+            }
+            .controls-wrapper {
+                width: calc(100% - 40px);
+                max-width: 320px;
+                justify-content: space-around;
+                border-radius: 20px;
+                gap: 5px;
+            }
+            .control-btn {
+                width: 46px;
+                height: 46px;
+            }
         }
     </style>
 </head>
@@ -324,6 +361,14 @@
                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                 </svg>
             </button>
+            
+            <!-- New Flip Camera Button -->
+            <button class="control-btn" id="flipCameraBtn" title="Switch Camera">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/>
+                </svg>
+            </button>
+
             <button class="control-btn hangup" id="hangupBtn" title="Leave Call">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"></path>
